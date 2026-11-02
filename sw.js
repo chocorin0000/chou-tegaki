@@ -8,7 +8,8 @@ self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k))))
+  // 同じ chocorin0000.github.io に「家電チェッカー」もあるので、消すのは自分（inkmemo-）の覚えだけ
+  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k.startsWith('inkmemo-') && k !== CACHE).map(k => caches.delete(k))))
     .then(() => self.clients.claim()));
 });
 self.addEventListener('fetch', e => {
