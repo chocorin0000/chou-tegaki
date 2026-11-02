@@ -7,7 +7,7 @@ import { InkView } from './ink.js';
 import { openDraw } from './draw.js';
 import { el, btn, toast, dialog, confirmDlg, TINT_FIG, TINT_DEL, TINT_OK, applyRotation, rotation, viewSize } from './ui.js';
 
-export const VERSION = 'v2';
+export const VERSION = 'v3';
 const $ = id => document.getElementById(id);
 const screens = ['list', 'edit', 'draw', 'set'];
 function show(name) {
@@ -452,7 +452,7 @@ function showSettings() {
   note('Android の超！手書きで使っているスクリプトを、そのまま使います。\n'
     + '・ファイル名に冒頭の文字を入れるには、新しいスクリプト（Code.gs）に貼り替えて、スクリプト プロパティに GEMINI_KEY（Gemini の API キー）を足し、「デプロイを管理」→ 鉛筆 → バージョン「新バージョン」→「デプロイ」をしてください。URL は変わりません。\n'
     + '・GEMINI_KEY がないときは、ファイル名は「メモ_作った日時.pdf」になります。');
-  box.appendChild(el('div', 'ver', '超！手書き Web 版 ' + VERSION));
+  box.appendChild(el('div', 'ver', '超！手書き Web 版 ' + VERSION + '　' + innerWidth + '×' + innerHeight + ' / ' + screen.width + '×' + screen.height + ' / ' + viewSize().join('×') + (navigator.standalone ? ' H' : '')));
 }
 
 // ---------------------------------------------------------------

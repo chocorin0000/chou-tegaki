@@ -78,20 +78,35 @@ export function confirmDlg(message, okText, title, danger = true) {
 let rot = 0; // 0 / 90 / -90（いま実際に回している角度）
 export const rotation = () => rot;
 /** want = 横向きにしたい、other = 反対の向き。機械がもう横長なら回さない */
+/**
+ * 本当の画面の大きさ。ホーム画面から開いたとき、iPhone は高さを上の帯（47 ほど）の分だけ少なく教えてきて、
+ * 下に隙間ができることがある。そのときは画面（screen）の大きさまで広げる。差が大きいとき（iPad の小さい窓など）は広げない。
+ */
+export function fullSize() {
+  let W = innerWidth, H = innerHeight;
+  if (navigator.standalone && screen.width && screen.height) {
+    const a = Math.max(screen.width, screen.height), b = Math.min(screen.width, screen.height);
+    const [fw, fh] = W < H ? [b, a] : [a, b];
+    if (fw >= W && fw - W <= 80) W = fw;
+    if (fh >= H && fh - H <= 80) H = fh;
+  }
+  return [W, H];
+}
 export function applyRotation(want, other) {
-  const W = innerWidth, H = innerHeight;
+  const [W, H] = fullSize();
   rot = want && W < H ? (other ? -90 : 90) : 0;
   const r = document.documentElement, b = document.body.style;
   r.classList.toggle('rot90', rot === 90);
   r.classList.toggle('rot270', rot === -90);
+  Object.assign(b, { position: 'fixed', left: '0', top: '0', transformOrigin: '0 0' });
   if (rot) Object.assign(b, {
-    position: 'fixed', left: '0', top: '0', width: H + 'px', height: W + 'px', transformOrigin: '0 0',
+    width: H + 'px', height: W + 'px',
     transform: rot === 90 ? `translateX(${W}px) rotate(90deg)` : `translateY(${H}px) rotate(-90deg)`,
   });
-  else Object.assign(b, { position: '', left: '', top: '', width: '', height: '', transform: '', transformOrigin: '' });
+  else Object.assign(b, { width: W + 'px', height: H + 'px', transform: '' });
 }
 /** 中身から見た画面の幅と高さ */
-export const viewSize = () => (rot ? [innerHeight, innerWidth] : [innerWidth, innerHeight]);
+export const viewSize = () => { const [W, H] = fullSize(); return rot ? [H, W] : [W, H]; };
 /** 指の位置を、canvas の中の座標に（回しているときは回し戻す） */
 export function localPos(e, cv) {
   const r = cv.getBoundingClientRect();
