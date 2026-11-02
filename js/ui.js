@@ -85,7 +85,8 @@ export const rotation = () => rot;
  */
 export function fullSize() {
   let W = innerWidth, H = innerHeight;
-  if (navigator.standalone && screen.width && screen.height) {
+  // iPad（短い辺が 600 以上）では広げない（iPad で文字の枠を押すとページが落ちたため、v5）
+  if (navigator.standalone && screen.width && screen.height && Math.min(screen.width, screen.height) < 600) {
     const a = Math.max(screen.width, screen.height), b = Math.min(screen.width, screen.height);
     const [fw, fh] = W < H ? [b, a] : [a, b];
     if (fw >= W && fw - W <= 80) W = fw;
@@ -99,13 +100,17 @@ export function applyRotation(want, other) {
   const r = document.documentElement, b = document.body.style;
   r.classList.toggle('rot90', rot === 90);
   r.classList.toggle('rot270', rot === -90);
+  // 回さず、広げもしないときは、body には何も付けない（v2 までと同じ）
+  const full = !rot && (W !== innerWidth || H !== innerHeight);
   const want2 = rot
     ? { width: H + 'px', height: W + 'px', transform: rot === 90 ? `translateX(${W}px) rotate(90deg)` : `translateY(${H}px) rotate(-90deg)` }
-    : { width: W + 'px', height: H + 'px', transform: '' };
+    : full ? { width: W + 'px', height: H + 'px', transform: '' } : null;
   const k = JSON.stringify(want2);
   if (k === lastBody) return; // 同じなら触らない（触ると、また大きさが変わったことになるため）
   lastBody = k;
-  Object.assign(b, { position: 'fixed', left: '0', top: '0', transformOrigin: '0 0' }, want2);
+  r.classList.toggle('full', full);
+  if (want2) Object.assign(b, { position: 'fixed', left: '0', top: '0', transformOrigin: '0 0' }, want2);
+  else Object.assign(b, { position: '', left: '', top: '', width: '', height: '', transform: '', transformOrigin: '' });
 }
 /** 中身から見た画面の幅と高さ */
 export const viewSize = () => { const [W, H] = fullSize(); return rot ? [H, W] : [W, H]; };

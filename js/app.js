@@ -7,7 +7,7 @@ import { InkView } from './ink.js';
 import { openDraw } from './draw.js';
 import { el, btn, toast, dialog, confirmDlg, TINT_FIG, TINT_DEL, TINT_OK, applyRotation, rotation, viewSize } from './ui.js';
 
-export const VERSION = 'v4';
+export const VERSION = 'v5';
 const $ = id => document.getElementById(id);
 const screens = ['list', 'edit', 'draw', 'set'];
 function show(name) {
@@ -487,6 +487,7 @@ function start() {
   try { prev = localStorage.getItem('inkmemo.screen') || ''; } catch (e) { /* */ }
   addLog(`起動 ${VERSION}（前は ${prev || '-'} の画面）${innerWidth}×${innerHeight}`);
   $('set-back').addEventListener('click', () => showList());
+  document.addEventListener('focusin', e => { if (/INPUT|TEXTAREA/.test(e.target.tagName)) addLog('入力の枠を押した'); });
   buildList();
   buildEdit();
   applyRot();
