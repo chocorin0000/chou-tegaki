@@ -1,6 +1,6 @@
 // 電波がないときでも開けるように、ページのファイルを覚えておく。
 // 電波があるときは、いつもサーバーから新しいものを読む（直した版がすぐに届くように）。
-const CACHE = 'inkmemo-v5';
+const CACHE = 'inkmemo-v6';
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png',
   'js/app.js', 'js/note.js', 'js/store.js', 'js/cloud.js', 'js/pdf.js', 'js/ink.js', 'js/draw.js', 'js/ui.js'];
 

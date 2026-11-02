@@ -7,7 +7,7 @@ import { InkView } from './ink.js';
 import { openDraw } from './draw.js';
 import { el, btn, toast, dialog, confirmDlg, TINT_FIG, TINT_DEL, TINT_OK, applyRotation, rotation, viewSize } from './ui.js';
 
-export const VERSION = 'v5';
+export const VERSION = 'v6';
 const $ = id => document.getElementById(id);
 const screens = ['list', 'edit', 'draw', 'set'];
 function show(name) {
@@ -385,15 +385,28 @@ function showSettings() {
   sec('自動でクラウドに保存（Google ドライブ）');
   note('Android の超！手書きと同じスクリプト（URL と合言葉）を入れると、書き終えるたびに Google ドライブの「手書きメモ」フォルダへ自動で保存します。'
     + 'どの機械（iPhone・iPad・Android）で書いたメモも同じフォルダに入り、ほかの機械のメモも取り込めます。');
+  // 文字の枠はページの中に置かない（iPad でページの中の枠を押すと落ちたため、v6）。
+  // 押すと、iPhone・iPad の入力の箱（prompt）が出る。
+  const field = (val, secret, ask) => {
+    const f = el('div', 'input field');
+    const o = { value: val, show: false };
+    o.paint = () => {
+      f.textContent = !o.value ? '（ここを押して入れる）' : secret && !o.show ? '●'.repeat(Math.min(o.value.length, 12)) : o.value;
+      f.classList.toggle('empty', !o.value);
+    };
+    f.addEventListener('click', () => {
+      const v = prompt(ask, o.value);
+      if (v == null) return; // キャンセル
+      o.value = v.trim(); o.paint(); save();
+    });
+    o.paint();
+    box.appendChild(f);
+    return o;
+  };
   label('ウェブアプリの URL（/exec で終わるもの）');
-  const url = el('textarea', 'input');
-  url.rows = 2; url.value = s.url; url.placeholder = 'https://script.google.com/macros/s/…/exec';
-  url.autocapitalize = 'off'; url.spellcheck = false;
-  box.appendChild(url);
+  const url = field(s.url, false, 'ウェブアプリの URL（https://script.google.com/macros/s/…/exec）を入れてください。長く押すと「ペースト」が出ます。');
   label('合言葉（スクリプト プロパティの PASSWORD と同じもの）');
-  const key = el('input', 'input');
-  key.type = 'password'; key.value = s.key; key.autocapitalize = 'off'; key.spellcheck = false;
-  box.appendChild(key);
+  const key = field(s.key, true, '合言葉を入れてください。');
   const check = (text, on, fn) => {
     const l = el('label', 'check');
     const c = el('input');
@@ -403,12 +416,11 @@ function showSettings() {
     box.appendChild(l);
     return c;
   };
-  check('合言葉を見せる', false, on => { key.type = on ? 'text' : 'password'; });
+  check('合言葉を見せる', false, on => { key.show = on; key.paint(); });
   const auto = check('書き終えたら自動でクラウドに保存する', s.auto, () => {});
   const pull = check('一覧を開いたとき、ほかの機械で書いたメモを取り込む', s.pull, () => {});
   check('「横向き」ボタンで回す向きを反対にする（右に倒して持つ）', s.rotOther, on => { S.setSettings({ rotOther: on }); applyRot(); });
   const save = () => S.setSettings({ url: url.value.trim(), key: key.value.trim(), auto: auto.checked, pull: pull.checked });
-  for (const x of [url, key]) x.addEventListener('change', save);
   for (const x of [auto, pull]) x.addEventListener('change', save);
 
   const button = (t, fn) => { const b = btn(t, fn); b.classList.add('wide'); box.appendChild(b); };
@@ -487,7 +499,7 @@ function start() {
   try { prev = localStorage.getItem('inkmemo.screen') || ''; } catch (e) { /* */ }
   addLog(`起動 ${VERSION}（前は ${prev || '-'} の画面）${innerWidth}×${innerHeight}`);
   $('set-back').addEventListener('click', () => showList());
-  document.addEventListener('focusin', e => { if (/INPUT|TEXTAREA/.test(e.target.tagName)) addLog('入力の枠を押した'); });
+  document.addEventListener('focusin', e => { if (e.target.tagName === 'TEXTAREA' || (e.target.tagName === 'INPUT' && e.target.type !== 'checkbox')) addLog('入力の枠を押した'); });
   buildList();
   buildEdit();
   applyRot();
