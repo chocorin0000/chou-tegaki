@@ -5,9 +5,9 @@ import * as C from './cloud.js';
 import { notesPdf } from './pdf.js';
 import { InkView } from './ink.js';
 import { openDraw } from './draw.js';
-import { el, btn, toast, dialog, confirmDlg, TINT_FIG, TINT_DEL, TINT_OK } from './ui.js';
+import { el, btn, toast, dialog, confirmDlg, TINT_FIG, TINT_DEL, TINT_OK, applyRotation, rotation, viewSize } from './ui.js';
 
-export const VERSION = 'v1.1';
+export const VERSION = 'v2';
 const $ = id => document.getElementById(id);
 const screens = ['list', 'edit', 'draw', 'set'];
 function show(name) {
@@ -29,7 +29,9 @@ function buildList() {
   const head = $('list-head');
   const title = el('div', 'title');
   title.innerHTML = '<span class="cho">超</span>！手書き';
-  head.append(title, btn('＋ 新しいメモ', () => openEdit(null), ['#FFC94D', '#2E2A20']));
+  const rb = btn('', () => toggleRot());
+  rb.classList.add('rot'); rotBtns.push(rb);
+  head.append(title, rb, btn('＋ 新しいメモ', () => openEdit(null), ['#FFC94D', '#2E2A20']));
   const row2 = $('list-row2');
   const st = el('div', 'cloud', '');
   st.id = 'cloud-text';
@@ -38,6 +40,23 @@ function buildList() {
   row2.append(st, size, btn('保存・バックアップ', () => showSettings()));
   showSize();
   C.onStatus(s => { $('cloud-text').textContent = s; });
+}
+
+// 横向き: iPhone が画面を回さないときでも、ボタンで中身を 90 度回して横長で使える
+const rotBtns = [];
+function toggleRot() {
+  S.setSettings({ rot: !S.settings().rot });
+  applyRot();
+}
+function applyRot() {
+  const s = S.settings();
+  applyRotation(s.rot, s.rotOther);
+  const portrait = innerWidth < innerHeight; // 機械がもう横長なら、ボタンは出さない
+  for (const b of rotBtns) {
+    b.textContent = rotation() ? '縦向き' : '横向き';
+    b.style.display = portrait ? '' : 'none';
+  }
+  if (ink) arrange();
 }
 
 function showSize() {
@@ -136,9 +155,11 @@ function buildEdit() {
   E.nl = btn('改行', () => ink.insertNewline(), TINT_OK);
   E.del = btn('消す', () => ink.backspace(), TINT_DEL);
   E.undo = btn('戻す', () => ink.undo());
+  E.rot = btn('', () => toggleRot());
+  rotBtns.push(E.rot);
   arrange();
   // iPhone は向きを変えた直後だと、まだ前の大きさを返すことがあるので、少し待ってからも並べ直す
-  const again = () => { arrange(); setTimeout(arrange, 250); setTimeout(arrange, 700); };
+  const again = () => { applyRot(); setTimeout(applyRot, 250); setTimeout(applyRot, 700); };
   addEventListener('resize', again);
   addEventListener('orientationchange', again);
   if (window.screen && screen.orientation) screen.orientation.addEventListener('change', again);
@@ -148,19 +169,20 @@ function buildEdit() {
 /** ボタンの並びを、今の向きに合わせる（横長で低い画面は L 字: 右の列と下の段） */
 let lastLand = null;
 function arrange() {
-  const w = document.documentElement.clientWidth || innerWidth, h = document.documentElement.clientHeight || innerHeight;
+  const [w, h] = viewSize();
   const land = w > h && h < 560;
-  if (land === lastLand) { if (ink) ink.resize(); return; }
-  lastLand = land;
+  const key = land + '/' + rotation();
+  if (key === lastLand) { if (ink) ink.resize(); return; }
+  lastLand = key;
   const scr = $('scr-edit');
   scr.classList.toggle('land', land);
   const side = $('edit-side'), r1 = $('edit-row1'), r2 = $('edit-row2');
   side.innerHTML = r1.innerHTML = r2.innerHTML = '';
   if (land) {
     side.append(E.undo, E.del, E.space, E.nl);
-    r1.append(E.list, E.send, E.fig, E.left, E.right);
+    r1.append(E.list, E.send, E.fig, E.rot, E.left, E.right);
   } else {
-    r1.append(E.list, E.fig, E.send);
+    r1.append(E.list, E.fig, E.send, E.rot);
     r2.append(E.left, E.right, E.space, E.nl, E.del, E.undo);
   }
 }
@@ -375,6 +397,7 @@ function showSettings() {
   check('合言葉を見せる', false, on => { key.type = on ? 'text' : 'password'; });
   const auto = check('書き終えたら自動でクラウドに保存する', s.auto, () => {});
   const pull = check('一覧を開いたとき、ほかの機械で書いたメモを取り込む', s.pull, () => {});
+  check('「横向き」ボタンで回す向きを反対にする（右に倒して持つ）', s.rotOther, on => { S.setSettings({ rotOther: on }); applyRot(); });
   const save = () => S.setSettings({ url: url.value.trim(), key: key.value.trim(), auto: auto.checked, pull: pull.checked });
   for (const x of [url, key]) x.addEventListener('change', save);
   for (const x of [auto, pull]) x.addEventListener('change', save);
@@ -429,7 +452,7 @@ function showSettings() {
   note('Android の超！手書きで使っているスクリプトを、そのまま使います。\n'
     + '・ファイル名に冒頭の文字を入れるには、新しいスクリプト（Code.gs）に貼り替えて、スクリプト プロパティに GEMINI_KEY（Gemini の API キー）を足し、「デプロイを管理」→ 鉛筆 → バージョン「新バージョン」→「デプロイ」をしてください。URL は変わりません。\n'
     + '・GEMINI_KEY がないときは、ファイル名は「メモ_作った日時.pdf」になります。');
-  box.appendChild(el('div', 'ver', '超！手書き Web 版 ' + VERSION + '　画面 ' + innerWidth + '×' + innerHeight));
+  box.appendChild(el('div', 'ver', '超！手書き Web 版 ' + VERSION));
 }
 
 // ---------------------------------------------------------------
@@ -440,6 +463,7 @@ function start() {
   $('set-back').addEventListener('click', () => showList());
   buildList();
   buildEdit();
+  applyRot();
   // ブラウザの拡大・ページのはね返りで、書いている画面が動かないように
   document.addEventListener('gesturestart', e => e.preventDefault());
   document.addEventListener('touchmove', e => { if (e.target.tagName === 'CANVAS') e.preventDefault(); }, { passive: false });

@@ -18,6 +18,15 @@
   --sa-t: env(safe-area-inset-top, 0px); --sa-b: env(safe-area-inset-bottom, 0px);
   --sa-l: env(safe-area-inset-left, 0px); --sa-r: env(safe-area-inset-right, 0px);
 }
+html.rot90 {
+  --sa-t: env(safe-area-inset-right, 0px); --sa-r: env(safe-area-inset-bottom, 0px);
+  --sa-b: env(safe-area-inset-left, 0px); --sa-l: env(safe-area-inset-top, 0px);
+}
+html.rot270 {
+  --sa-t: env(safe-area-inset-left, 0px); --sa-r: env(safe-area-inset-top, 0px);
+  --sa-b: env(safe-area-inset-right, 0px); --sa-l: env(safe-area-inset-bottom, 0px);
+}
+#list-head .btn.rot { padding: 0 10px; margin-right: 6px; background: #5A6B7A; }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body {
   margin: 0; height: 100%; overflow: hidden; background: var(--bar); color: #222;

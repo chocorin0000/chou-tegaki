@@ -73,3 +73,29 @@ export function dialog({ title, message, items, buttons, body, cancel = 'やめ�
 export function confirmDlg(message, okText, title, danger = true) {
   return dialog({ title, message, buttons: [{ text: okText, value: true, tint: danger ? '#C0392B' : '#1E6FD9' }] });
 }
+
+// ---- 横向き（iPhone が画面を回さないときのために、中身を 90 度回す） ----
+let rot = 0; // 0 / 90 / -90（いま実際に回している角度）
+export const rotation = () => rot;
+/** want = 横向きにしたい、other = 反対の向き。機械がもう横長なら回さない */
+export function applyRotation(want, other) {
+  const W = innerWidth, H = innerHeight;
+  rot = want && W < H ? (other ? -90 : 90) : 0;
+  const r = document.documentElement, b = document.body.style;
+  r.classList.toggle('rot90', rot === 90);
+  r.classList.toggle('rot270', rot === -90);
+  if (rot) Object.assign(b, {
+    position: 'fixed', left: '0', top: '0', width: H + 'px', height: W + 'px', transformOrigin: '0 0',
+    transform: rot === 90 ? `translateX(${W}px) rotate(90deg)` : `translateY(${H}px) rotate(-90deg)`,
+  });
+  else Object.assign(b, { position: '', left: '', top: '', width: '', height: '', transform: '', transformOrigin: '' });
+}
+/** 中身から見た画面の幅と高さ */
+export const viewSize = () => (rot ? [innerHeight, innerWidth] : [innerWidth, innerHeight]);
+/** 指の位置を、canvas の中の座標に（回しているときは回し戻す） */
+export function localPos(e, cv) {
+  const r = cv.getBoundingClientRect();
+  if (rot === 90) return [e.clientY - r.top, r.right - e.clientX];
+  if (rot === -90) return [r.bottom - e.clientY, e.clientX - r.left];
+  return [e.clientX - r.left, e.clientY - r.top];
+}

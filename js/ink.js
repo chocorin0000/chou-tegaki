@@ -1,4 +1,5 @@
 // 手書きの画面（Android 版の InkView と同じ動き）。
+import { localPos } from './ui.js';
 // 画面のどこに書いてもよく、指を離してしばらく書かなければ、書いた字を小さくしてカーソルの位置に入れる。
 // - 2 本指でなぞる: ノートを上下に動かす
 // - 軽くタップ（何も書きかけていないとき）: そこにカーソルを動かす。図をタップすると図を直す
@@ -31,7 +32,7 @@ export class InkView {
   }
 
   resize() {
-    const r = this.cv.getBoundingClientRect();
+    const r = { width: this.cv.clientWidth, height: this.cv.clientHeight }; // 回していても中身から見た大きさ
     if (!r.width || !r.height) return;
     const dpr = window.devicePixelRatio || 1;
     this.w = r.width; this.h = r.height;
@@ -248,8 +249,7 @@ export class InkView {
   // ---- タッチ ----
 
   pos(e) {
-    const r = this.cv.getBoundingClientRect();
-    return [e.clientX - r.left, e.clientY - r.top];
+    return localPos(e, this.cv);
   }
 
   avgY() {

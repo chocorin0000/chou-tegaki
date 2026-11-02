@@ -4,7 +4,7 @@
 //   枠の中をなぞると動く、角の丸で大きさ（直線・矢印 1 つは両端の丸）、上の × で消す。色・太さ・塗りも変えられる。
 // 「ノートに入れる」で、書いたものを 1 つの図にする。図の幅はノートの行の幅（行の単位）。上下の余白は切る。
 import { figure, css, fillColor, argb, shapeOf, fillOf } from './note.js';
-import { el, btn, toast, dialog, TINT_OK, TINT_DEL } from './ui.js';
+import { el, btn, toast, dialog, TINT_OK, TINT_DEL, localPos } from './ui.js';
 
 const PEN = 0, LINE = 1, ARROW = 2, RECT = 3, CIRCLE = 4, ERASER = 5, SELECT = 6;
 const TOOL_ORDER = [SELECT, PEN, LINE, ARROW, RECT, CIRCLE, ERASER];
@@ -146,7 +146,7 @@ class DrawScreen {
   }
 
   resize() {
-    const b = this.cv.getBoundingClientRect();
+    const b = { width: this.cv.clientWidth, height: this.cv.clientHeight };
     if (!b.width) return;
     const dpr = window.devicePixelRatio || 1;
     this.w = b.width; this.h = b.height;
@@ -445,7 +445,7 @@ class DrawScreen {
 
   // ---- タッチ ----
 
-  pos(e) { const r = this.cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+  pos(e) { return localPos(e, this.cv); }
   avgY() { let s = 0; for (const p of this.ptrs.values()) s += p[1]; return s / Math.max(1, this.ptrs.size); }
 
   // Apple Pencil を使ったあとは、ペンだけで書き、指はノートを上下に動かすだけにする（手のひらで書かれないように）
