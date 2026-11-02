@@ -7,7 +7,7 @@ import { InkView } from './ink.js';
 import { openDraw } from './draw.js';
 import { el, btn, toast, dialog, confirmDlg, TINT_FIG, TINT_DEL, TINT_OK } from './ui.js';
 
-export const VERSION = 'v1';
+export const VERSION = 'v1.1';
 const $ = id => document.getElementById(id);
 const screens = ['list', 'edit', 'draw', 'set'];
 function show(name) {
@@ -137,12 +137,21 @@ function buildEdit() {
   E.del = btn('消す', () => ink.backspace(), TINT_DEL);
   E.undo = btn('戻す', () => ink.undo());
   arrange();
-  addEventListener('resize', arrange);
+  // iPhone は向きを変えた直後だと、まだ前の大きさを返すことがあるので、少し待ってからも並べ直す
+  const again = () => { arrange(); setTimeout(arrange, 250); setTimeout(arrange, 700); };
+  addEventListener('resize', again);
+  addEventListener('orientationchange', again);
+  if (window.screen && screen.orientation) screen.orientation.addEventListener('change', again);
+  matchMedia('(orientation: landscape)').addEventListener('change', again);
 }
 
 /** ボタンの並びを、今の向きに合わせる（横長で低い画面は L 字: 右の列と下の段） */
+let lastLand = null;
 function arrange() {
-  const land = innerWidth > innerHeight && innerHeight < 560;
+  const w = document.documentElement.clientWidth || innerWidth, h = document.documentElement.clientHeight || innerHeight;
+  const land = w > h && h < 560;
+  if (land === lastLand) { if (ink) ink.resize(); return; }
+  lastLand = land;
   const scr = $('scr-edit');
   scr.classList.toggle('land', land);
   const side = $('edit-side'), r1 = $('edit-row1'), r2 = $('edit-row2');
@@ -420,7 +429,7 @@ function showSettings() {
   note('Android の超！手書きで使っているスクリプトを、そのまま使います。\n'
     + '・ファイル名に冒頭の文字を入れるには、新しいスクリプト（Code.gs）に貼り替えて、スクリプト プロパティに GEMINI_KEY（Gemini の API キー）を足し、「デプロイを管理」→ 鉛筆 → バージョン「新バージョン」→「デプロイ」をしてください。URL は変わりません。\n'
     + '・GEMINI_KEY がないときは、ファイル名は「メモ_作った日時.pdf」になります。');
-  box.appendChild(el('div', 'ver', '超！手書き Web 版 ' + VERSION));
+  box.appendChild(el('div', 'ver', '超！手書き Web 版 ' + VERSION + '　画面 ' + innerWidth + '×' + innerHeight));
 }
 
 // ---------------------------------------------------------------
