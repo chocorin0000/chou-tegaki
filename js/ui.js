@@ -76,6 +76,7 @@ export function confirmDlg(message, okText, title, danger = true) {
 
 // ---- 横向き（iPhone が画面を回さないときのために、中身を 90 度回す） ----
 let rot = 0; // 0 / 90 / -90（いま実際に回している角度）
+let lastBody = '';
 export const rotation = () => rot;
 /** want = 横向きにしたい、other = 反対の向き。機械がもう横長なら回さない */
 /**
@@ -98,12 +99,13 @@ export function applyRotation(want, other) {
   const r = document.documentElement, b = document.body.style;
   r.classList.toggle('rot90', rot === 90);
   r.classList.toggle('rot270', rot === -90);
-  Object.assign(b, { position: 'fixed', left: '0', top: '0', transformOrigin: '0 0' });
-  if (rot) Object.assign(b, {
-    width: H + 'px', height: W + 'px',
-    transform: rot === 90 ? `translateX(${W}px) rotate(90deg)` : `translateY(${H}px) rotate(-90deg)`,
-  });
-  else Object.assign(b, { width: W + 'px', height: H + 'px', transform: '' });
+  const want2 = rot
+    ? { width: H + 'px', height: W + 'px', transform: rot === 90 ? `translateX(${W}px) rotate(90deg)` : `translateY(${H}px) rotate(-90deg)` }
+    : { width: W + 'px', height: H + 'px', transform: '' };
+  const k = JSON.stringify(want2);
+  if (k === lastBody) return; // 同じなら触らない（触ると、また大きさが変わったことになるため）
+  lastBody = k;
+  Object.assign(b, { position: 'fixed', left: '0', top: '0', transformOrigin: '0 0' }, want2);
 }
 /** 中身から見た画面の幅と高さ */
 export const viewSize = () => { const [W, H] = fullSize(); return rot ? [H, W] : [W, H]; };

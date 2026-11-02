@@ -7,10 +7,11 @@ import { InkView } from './ink.js';
 import { openDraw } from './draw.js';
 import { el, btn, toast, dialog, confirmDlg, TINT_FIG, TINT_DEL, TINT_OK, applyRotation, rotation, viewSize } from './ui.js';
 
-export const VERSION = 'v3';
+export const VERSION = 'v4';
 const $ = id => document.getElementById(id);
 const screens = ['list', 'edit', 'draw', 'set'];
 function show(name) {
+  try { localStorage.setItem('inkmemo.screen', name); } catch (e) { /* なくてもよい */ }
   for (const s of screens) $('scr-' + s).hidden = s !== name;
 }
 
@@ -48,7 +49,10 @@ function toggleRot() {
   S.setSettings({ rot: !S.settings().rot });
   applyRot();
 }
+/** 文字を入力中（キーボードが出ている）か */
+const typing = () => { const a = document.activeElement; return !!a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA'); };
 function applyRot() {
+  if (typing()) return; // キーボードで大きさが変わっても、並べ直さない
   const s = S.settings();
   applyRotation(s.rot, s.rotOther);
   const portrait = innerWidth < innerHeight; // 機械がもう横長なら、ボタンは出さない
@@ -159,7 +163,12 @@ function buildEdit() {
   rotBtns.push(E.rot);
   arrange();
   // iPhone は向きを変えた直後だと、まだ前の大きさを返すことがあるので、少し待ってからも並べ直す
-  const again = () => { applyRot(); setTimeout(applyRot, 250); setTimeout(applyRot, 700); };
+  // 待ちは重ねない（大きさが何度も変わっても、最後の 1 回だけ並べ直す）
+  let t1 = 0, t2 = 0;
+  const again = () => {
+    clearTimeout(t1); clearTimeout(t2);
+    t1 = setTimeout(applyRot, 60); t2 = setTimeout(applyRot, 700);
+  };
   addEventListener('resize', again);
   addEventListener('orientationchange', again);
   if (window.screen && screen.orientation) screen.orientation.addEventListener('change', again);
@@ -453,13 +462,30 @@ function showSettings() {
     + '・ファイル名に冒頭の文字を入れるには、新しいスクリプト（Code.gs）に貼り替えて、スクリプト プロパティに GEMINI_KEY（Gemini の API キー）を足し、「デプロイを管理」→ 鉛筆 → バージョン「新バージョン」→「デプロイ」をしてください。URL は変わりません。\n'
     + '・GEMINI_KEY がないときは、ファイル名は「メモ_作った日時.pdf」になります。');
   box.appendChild(el('div', 'ver', '超！手書き Web 版 ' + VERSION + '　' + innerWidth + '×' + innerHeight + ' / ' + screen.width + '×' + screen.height + ' / ' + viewSize().join('×') + (navigator.standalone ? ' H' : '')));
+  const lg = readLog();
+  if (lg.length) box.appendChild(el('div', 'ver', '記録:\n' + lg.slice(-8).join('\n')));
 }
 
 // ---------------------------------------------------------------
 // はじめ
 // ---------------------------------------------------------------
 
+// 困ったときのための小さな記録（設定の画面のいちばん下に出す）
+function readLog() { try { return JSON.parse(localStorage.getItem('inkmemo.log') || '[]'); } catch (e) { return []; } }
+function addLog(t) {
+  try {
+    const d = new Date(), l = readLog();
+    l.push(`${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')} ${t}`);
+    localStorage.setItem('inkmemo.log', JSON.stringify(l.slice(-20)));
+  } catch (e) { /* なくてもよい */ }
+}
+addEventListener('error', e => addLog('エラー ' + (e.message || '') + ' ' + (e.filename || '').split('/').pop() + ':' + (e.lineno || '')));
+addEventListener('unhandledrejection', e => addLog('エラー ' + ((e.reason && e.reason.message) || e.reason)));
+
 function start() {
+  let prev = '';
+  try { prev = localStorage.getItem('inkmemo.screen') || ''; } catch (e) { /* */ }
+  addLog(`起動 ${VERSION}（前は ${prev || '-'} の画面）${innerWidth}×${innerHeight}`);
   $('set-back').addEventListener('click', () => showList());
   buildList();
   buildEdit();

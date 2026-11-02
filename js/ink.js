@@ -35,6 +35,7 @@ export class InkView {
     const r = { width: this.cv.clientWidth, height: this.cv.clientHeight }; // 回していても中身から見た大きさ
     if (!r.width || !r.height) return;
     const dpr = window.devicePixelRatio || 1;
+    if (r.width === this.w && r.height === this.h && this.cv.width === Math.round(r.width * dpr)) { this.draw(); return; }
     this.w = r.width; this.h = r.height;
     this.cv.width = Math.round(r.width * dpr);
     this.cv.height = Math.round(r.height * dpr);

@@ -149,6 +149,7 @@ class DrawScreen {
     const b = { width: this.cv.clientWidth, height: this.cv.clientHeight };
     if (!b.width) return;
     const dpr = window.devicePixelRatio || 1;
+    if (b.width === this.w && b.height === this.h && this.cv.width === Math.round(b.width * dpr)) { this.draw(); return; }
     this.w = b.width; this.h = b.height;
     this.cv.width = Math.round(b.width * dpr);
     this.cv.height = Math.round(b.height * dpr);
