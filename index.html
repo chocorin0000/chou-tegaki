@@ -19,18 +19,20 @@
   --sa-l: env(safe-area-inset-left, 0px); --sa-r: env(safe-area-inset-right, 0px);
   /* 画面の下のよけ（v8 から、超！アルバム Web 版 v4 と同じに、iPhone のよけ（約 34）から 24（約 4mm）減らす。
      iPad はよけ（20）が 0 になり、ボタンの下の空きが小さくなる） */
-  --pad-b: max(0px, calc(env(safe-area-inset-bottom, 0px) - 24px));
+  --pad-b: max(0px, calc(env(safe-area-inset-bottom, 0px) - 34px)); /* v9: iPhone は 0（もう少し下まで） */
 }
+/* iPad（v9 から画面の下の端まで広げる）: よけ（20）から 8 減らして 12 あける */
+html.ipad { --pad-b: max(0px, calc(env(safe-area-inset-bottom, 0px) - 8px)); }
 /* 横向きボタンで回したとき: 機械の下の端は横、横の端が下になる。下の端の段は少し（6）あける（欠けないように） */
 html.rot90 {
   --sa-t: env(safe-area-inset-right, 0px); --sa-r: max(0px, calc(env(safe-area-inset-bottom, 0px) - 24px));
   --sa-b: env(safe-area-inset-left, 0px); --sa-l: env(safe-area-inset-top, 0px);
-  --pad-b: calc(env(safe-area-inset-left, 0px) + 6px);
+  --pad-b: calc(env(safe-area-inset-left, 0px) + 3px);
 }
 html.rot270 {
   --sa-t: env(safe-area-inset-left, 0px); --sa-r: env(safe-area-inset-top, 0px);
   --sa-b: env(safe-area-inset-right, 0px); --sa-l: max(0px, calc(env(safe-area-inset-bottom, 0px) - 24px));
-  --pad-b: calc(env(safe-area-inset-right, 0px) + 6px);
+  --pad-b: calc(env(safe-area-inset-right, 0px) + 3px);
 }
 #list-head .btn.rot { padding: 0 10px; margin-right: 6px; background: #5A6B7A; }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
