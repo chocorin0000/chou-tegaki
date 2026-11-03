@@ -83,10 +83,12 @@ export const rotation = () => rot;
  * 本当の画面の大きさ。ホーム画面から開いたとき、iPhone は高さを上の帯（47 ほど）の分だけ少なく教えてきて、
  * 下に隙間ができることがある。そのときは画面（screen）の大きさまで広げる。差が大きいとき（iPad の小さい窓など）は広げない。
  */
+// v8 から広げない（超！アルバム Web 版 v2 と同じ）。iPhone で広げると、下のボタンが少し（1mm くらい）欠けた
+const WIDEN = false;
 export function fullSize() {
   let W = innerWidth, H = innerHeight;
   // iPad（短い辺が 600 以上）では広げない（iPad で文字の枠を押すとページが落ちたため、v5）
-  if (navigator.standalone && screen.width && screen.height && Math.min(screen.width, screen.height) < 600) {
+  if (WIDEN && navigator.standalone && screen.width && screen.height && Math.min(screen.width, screen.height) < 600) {
     const a = Math.max(screen.width, screen.height), b = Math.min(screen.width, screen.height);
     const [fw, fh] = W < H ? [b, a] : [a, b];
     if (fw >= W && fw - W <= 80) W = fw;

@@ -7,7 +7,7 @@ import { InkView, lineUnits } from './ink.js';
 import { openDraw } from './draw.js';
 import { el, btn, toast, dialog, confirmDlg, TINT_FIG, TINT_DEL, TINT_OK, applyRotation, rotation, viewSize } from './ui.js';
 
-export const VERSION = 'v7';
+export const VERSION = 'v8';
 const $ = id => document.getElementById(id);
 const screens = ['list', 'edit', 'draw', 'set'];
 function show(name) {
@@ -363,7 +363,8 @@ export async function sendFile(file) {
   });
   if (!ok) return;
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try { await navigator.share({ files: [file], title: file.name }); }
+    // ファイルだけを渡す（v8 から。title も渡すと、iPad では名前の文字が別の txt ファイルになって一緒に送られた）
+    try { await navigator.share({ files: [file] }); }
     catch (e) { if (e.name !== 'AbortError') toast('送れませんでした: ' + e.message, true); }
     return;
   }
