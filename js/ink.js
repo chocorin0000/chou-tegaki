@@ -7,6 +7,19 @@ import { localPos } from './ui.js';
 import { layout, drawItem, glyph, space, newline, span, figScale, canvasPen, GLYPH, NEWLINE, FIGURE, inkWidth } from './note.js';
 
 export const COMMIT_DELAY_MS = 700;
+/** 自動空白（v7 から、Android 版 v20・v21 と同じ）: 指を離してこれだけ書かなければ空白を 1 つ入れる */
+export const AUTO_SPACE_MS = 2300;
+const LINEW = 'inkmemo.lineW'; // 縦の画面・横の画面の 1 行の長さ（行の単位）。送るときに使う
+
+/** 書く画面の 1 行の長さ（行の単位）。まだその向きで開いていなければ、画面の大きさから見積もる */
+export function lineUnits(land) {
+  try {
+    const v = JSON.parse(localStorage.getItem(LINEW) || '{}')[land ? 'land' : 'port'];
+    if (v > 0) return v;
+  } catch (e) { /* 見積もる */ }
+  const a = Math.min(screen.width, screen.height), b = Math.max(screen.width, screen.height);
+  return land ? (b - 28 - 64) / 40 : (a - 28) / 40;
+}
 
 export class InkView {
   constructor(canvas) {
@@ -16,7 +29,8 @@ export class InkView {
     this.lineH = 40; this.marginL = 18; this.marginR = 10; this.marginT = 12;
     this.note = null; this.cursor = 0; this.scrollY = 0;
     this.pending = []; this.cur = null;
-    this.lastTop = -1; this.lastH = -1;
+    this.recentH = []; this.lastBottom = 0;
+    this.autoSpace = false; this.spaceTimer = 0;
     this.undoStack = [];
     this.ptrs = new Map();
     this.scrolling = false; this.penSeen = false;
@@ -42,6 +56,38 @@ export class InkView {
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.ensureCursorVisible();
     this.draw();
+    // この向きの画面の 1 行の長さを覚える（「送る」で、縦の画面／横の画面の 1 行に合わせるときに使う）
+    try {
+      const o = JSON.parse(localStorage.getItem(LINEW) || '{}');
+      o[r.width < r.height ? 'port' : 'land'] = this.maxW();
+      localStorage.setItem(LINEW, JSON.stringify(o));
+    } catch (e) { /* 覚えられなくても見積もる */ }
+  }
+
+  setAutoSpace(on) {
+    this.autoSpace = on;
+    if (!on) clearTimeout(this.spaceTimer);
+  }
+
+  /** 書くのを止めて字が入ったとき（0.7 秒）。自動空白があれば、指を離してから 2.3 秒で空白を入れる用意をする */
+  commitByTimer() {
+    const had = this.pending.length > 0;
+    this.commitPending();
+    if (had && this.autoSpace) this.spaceTimer = setTimeout(() => this.autoSpaceNow(), AUTO_SPACE_MS - COMMIT_DELAY_MS);
+  }
+
+  /** 自動の空白を入れる（カーソルの前が手書きの字のときだけ。空白・改行・図のあとには入れない） */
+  autoSpaceNow() {
+    if (!this.note || this.pending.length || this.cur || this.cursor === 0) return;
+    if (this.note.items[this.cursor - 1].type !== GLYPH) return;
+    this.insert(space());
+  }
+
+  /** ふつうの字の高さ: 前の 5 字の高さの真ん中の値（まだなければ -1） */
+  typicalH() {
+    const a = this.recentH.slice().sort((x, y) => x - y), n = a.length;
+    if (!n) return -1;
+    return n % 2 ? a[n >> 1] : (a[n / 2 - 1] + a[n / 2]) / 2;
   }
 
   setNote(n) {
@@ -49,7 +95,8 @@ export class InkView {
     this.cursor = n.items.length;
     this.undoStack = [];
     this.pending = []; this.cur = null;
-    this.lastTop = this.lastH = -1;
+    this.recentH = []; this.lastBottom = 0;
+    clearTimeout(this.spaceTimer);
     this.scrollY = 0;
     this.ensureCursorVisible();
     this.invalidate();
@@ -61,7 +108,7 @@ export class InkView {
 
   // ---- ボタンから呼ぶ操作 ----
 
-  commitNow() { clearTimeout(this.timer); this.commitPending(); }
+  commitNow() { clearTimeout(this.timer); clearTimeout(this.spaceTimer); this.commitPending(); }
   insertSpace() { this.commitNow(); this.insert(space()); }
   insertNewline() { this.commitNow(); this.insert(newline()); }
   insertFigure(f) { this.commitNow(); this.insert(f); }
@@ -69,6 +116,7 @@ export class InkView {
   /** index の図を描き直したものと入れ替える（fig が null なら消す） */
   replaceFigure(index, fig) {
     if (!this.note || index < 0 || index >= this.note.items.length) return;
+    clearTimeout(this.spaceTimer);
     this.pushUndo();
     if (!fig) {
       this.note.items.splice(index, 1);
@@ -79,10 +127,11 @@ export class InkView {
 
   /** 書きかけがあればその最後の 1 画を、なければカーソルの前の 1 つを消す */
   backspace() {
+    clearTimeout(this.spaceTimer); // ボタンを押したら、自動の空白は入れない
     if (this.pending.length) {
       this.pending.pop();
       clearTimeout(this.timer);
-      if (this.pending.length) this.timer = setTimeout(() => this.commitPending(), COMMIT_DELAY_MS);
+      if (this.pending.length) this.timer = setTimeout(() => this.commitByTimer(), COMMIT_DELAY_MS);
       this.invalidate();
       return;
     }
@@ -95,6 +144,7 @@ export class InkView {
 
   /** 書きかけがあればそれを捨てる。なければ 1 つ前の状態に戻す */
   undo() {
+    clearTimeout(this.spaceTimer);
     if (this.pending.length) {
       this.pending = [];
       clearTimeout(this.timer);
@@ -143,16 +193,22 @@ export class InkView {
       by0 = Math.min(by0, s[k + 1]); by1 = Math.max(by1, s[k + 1]);
     }
     const bw = bx1 - bx0, bh = by1 - by0;
-    const ref = this.w * 0.3; // 前に字を入れていないときの「ふつうの字の高さ」
+    // 前に字を入れていないときの「ふつうの字の高さ」（v7 から、Android 版 v21 と同じ 1cm くらい。
+    // 前の画面の幅の 3 割だと、ふつうの大きさで書いた字まで小さな字とみなされ、行の 3 分の 1 くらいに縮んでいた）
+    const ref = 64;
+    // ふつうの字の高さは、前の 5 字の真ん中の値（前の 1 字だけだと、1 字だけ大きく書いたあとの字が全部小さくなった）
+    const typical = this.typicalH();
     let refH, top;
-    if (this.lastH > 0 && bh < this.lastH * 0.6) {
-      // 小さな字（「、」「。」「ー」など）: 前の字と同じ大きさの枠の中の位置に置く
-      refH = this.lastH; top = this.lastTop;
-    } else if (this.lastH < 0 && bh < ref * 0.5) {
+    if (typical > 0 && bh < typical * 0.45) {
+      // 小さな字（「、」「。」「ー」など）: ふつうの字の大きさの枠の中に、前の字の下の端にそろえて置く
+      refH = typical; top = this.lastBottom - typical;
+    } else if (typical < 0 && bh < ref * 0.45) {
       refH = ref; top = (by0 + by1) / 2 - ref / 2;
     } else {
       refH = Math.max(bh, 1); top = by0;
-      this.lastH = refH; this.lastTop = top;
+      this.recentH.push(refH);
+      if (this.recentH.length > 5) this.recentH.shift();
+      this.lastBottom = by1;
     }
     const pad = 0.06, s = 0.8 / refH;
     let minY = Infinity, maxY = -Infinity;
@@ -265,6 +321,7 @@ export class InkView {
     try { this.cv.setPointerCapture(e.pointerId); } catch (x) { /* なくてよい */ }
     const p = this.pos(e);
     clearTimeout(this.timer);
+    clearTimeout(this.spaceTimer); // 続けて書き始めたら空白は入れない
     if (e.pointerType === 'pen') {
       // Apple Pencil: いつも書く（手のひらが画面に触れていても）
       this.penSeen = true;
@@ -330,7 +387,7 @@ export class InkView {
           else this.tapCursor(p[0], p[1]);
         } else {
           this.pending.push(this.cur);
-          this.timer = setTimeout(() => this.commitPending(), COMMIT_DELAY_MS);
+          this.timer = setTimeout(() => this.commitByTimer(), COMMIT_DELAY_MS);
         }
         this.cur = null;
       }
@@ -342,7 +399,7 @@ export class InkView {
     if (this.scrolling) {
       if (this.ptrs.size) { this.lastScrollY = this.avgY(); return; }
       this.scrolling = false;
-      if (this.pending.length && !this.cur) this.timer = setTimeout(() => this.commitPending(), COMMIT_DELAY_MS);
+      if (this.pending.length && !this.cur) this.timer = setTimeout(() => this.commitByTimer(), COMMIT_DELAY_MS);
     }
     this.invalidate();
   }
@@ -351,7 +408,7 @@ export class InkView {
     this.ptrs.delete(e.pointerId);
     if (e.pointerId === this.drawId) { this.drawId = null; this.cur = null; }
     if (!this.ptrs.size) this.scrolling = false;
-    if (this.pending.length) this.timer = setTimeout(() => this.commitPending(), COMMIT_DELAY_MS);
+    if (this.pending.length) this.timer = setTimeout(() => this.commitByTimer(), COMMIT_DELAY_MS);
     this.invalidate();
   }
 

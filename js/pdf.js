@@ -1,9 +1,10 @@
 // メモを PDF にする（Android 版の PdfExport と同じ並べ方）。
 // 字と図は線（ベクター）のまま入れるので、拡大してもきれいで、ファイルも小さい。用紙は A4 縦。
+// v7 から「送る」では、1 行の長さを、書く画面（縦向き / 横向き）の 1 行と同じにできる（行の切れ目が画面と同じになる）。
 // 上の日時の文字は、日本語の字の形を PDF に入れなくて済むように、小さな画像（JPEG）にして入れる。
 import { layout, drawItem, span, GLYPH, FIGURE, fmtDate } from './note.js';
 
-const PAGE_W = 595, PAGE_H = 842, MARGIN = 40, HEAD = 34, LINE_H = 30;
+const PAGE_W = 595, PAGE_H = 842, MARGIN = 40, HEAD = 34, LINE_H0 = 30;
 const enc = new TextEncoder();
 const num = v => {
   const s = (Math.round(v * 100) / 100).toFixed(2);
@@ -62,8 +63,13 @@ async function deflate(bytes) {
   return new Uint8Array(await out);
 }
 
-/** 全部のメモを 1 つの PDF に。メモごとに新しいページから始める。Uint8Array を返す */
-export async function notesPdf(notes) {
+/**
+ * 全部のメモを 1 つの PDF に。メモごとに新しいページから始める。Uint8Array を返す。
+ * lineUnits: 1 行の長さ（行の単位。書く画面の 1 行と同じ値を渡すと、行の切れ目が画面と同じになる）。0 ならいつもの大きさ
+ */
+export async function notesPdf(notes, lineUnits = 0) {
+  const LINE_H = Math.max(14, Math.min(80, lineUnits > 0 ? (PAGE_W - MARGIN * 2) / lineUnits : LINE_H0));
+  const top0 = MARGIN + HEAD - LINE_H0; // 1 行目の上（行が高くても、上の日時の字に重ならない）
   const objs = []; // [{dict, stream?}]
   const add = o => { objs.push(o); return objs.length + 2; }; // 1 = Catalog、2 = Pages
   const pageIds = [];
@@ -73,10 +79,10 @@ export async function notesPdf(notes) {
     const n = notes[k];
     const label = notes.length > 1 ? `メモ ${k + 1} / ${notes.length}　　` : '';
     const maxW = (PAGE_W - MARGIN * 2) / LINE_H;
-    const perPage = Math.floor((PAGE_H - MARGIN - HEAD - MARGIN) / LINE_H);
+    const perPage = Math.floor((PAGE_H - top0 - MARGIN - HEAD) / LINE_H);
     const { lineOf, xOf, lines } = layout(n.items, maxW, perPage);
     const pages = Math.max(1, Math.ceil(lines / perPage));
-    const head = `${label}作成 ${fmtDate(n.created)}　　更新 ${fmtDate(n.updated)}`;
+    const head = `${label}作成 ${fmtDate(n.created)}　　更新 ${fmtDate(n.updated || Date.now())}`;
 
     for (let p = 0; p < pages; p++) {
       const ops = [];
@@ -88,7 +94,6 @@ export async function notesPdf(notes) {
       const imId = add({ dict: `<< /Type /XObject /Subtype /Image /Width ${img.w} /Height ${img.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${img.bytes.length} >>`, stream: img.bytes });
       ops.push(`q ${num(tw)} 0 0 ${th} ${MARGIN} ${num(PAGE_H - (MARGIN - 4))} cm /Im0 Do Q`);
       // 罫線
-      const top0 = MARGIN + HEAD - LINE_H;
       ops.push('1 J 1 j 0.725 0.812 0.902 RG 0.6 w');
       for (let l = 0; l < perPage; l++) {
         const y = num(PAGE_H - (top0 + (l + 1) * LINE_H));

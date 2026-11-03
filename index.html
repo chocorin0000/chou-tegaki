@@ -82,6 +82,22 @@ button { font: inherit; touch-action: manipulation; }
 #scr-edit.land #edit-side { display: flex; }
 #scr-edit.land #edit-row1 { height: 46px; }
 #scr-edit.land .btn { font-size: 15px; }
+/* 自動空白のボタン（3 行の字。あり は黄色） */
+#scr-edit .btn.auto { white-space: pre-line; font-size: 12px !important; line-height: 1.05; font-weight: bold; }
+#scr-edit .btn.auto.yes { background: #FFE08A; color: #5A4300; }
+#scr-edit.land #edit-side .btn.auto { flex: 1.15; }
+
+/* 送る（うすい色の、角の丸い横長のボタン） */
+.sendhead { font-size: 15px; font-weight: bold; color: #333; padding: 12px 2px 4px; }
+.sendbtn {
+  display: flex; flex-direction: column; align-items: center; width: 100%; margin: 4px 0; padding: 8px 12px;
+  border-radius: 12px; font-size: 16px; line-height: 1.3; cursor: pointer;
+}
+.sendbtn .sub { font-size: 13px; opacity: 0.75; }
+.sendbtn:active { filter: brightness(0.92); }
+.sendbtn.green { background: #DDF2E3; color: #1E4D33; border: 1px solid #BCCEC1; }
+.sendbtn.blue { background: #DCEAF7; color: #1C3D63; border: 1px solid #BBC7D2; }
+.sendnote { font-size: 13px; color: #666; padding: 10px 2px 4px; }
 
 /* 図を描く */
 .draw .bar { height: 52px; }

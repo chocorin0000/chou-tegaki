@@ -3,11 +3,11 @@ import * as N from './note.js';
 import * as S from './store.js';
 import * as C from './cloud.js';
 import { notesPdf } from './pdf.js';
-import { InkView } from './ink.js';
+import { InkView, lineUnits } from './ink.js';
 import { openDraw } from './draw.js';
 import { el, btn, toast, dialog, confirmDlg, TINT_FIG, TINT_DEL, TINT_OK, applyRotation, rotation, viewSize } from './ui.js';
 
-export const VERSION = 'v6';
+export const VERSION = 'v7';
 const $ = id => document.getElementById(id);
 const screens = ['list', 'edit', 'draw', 'set'];
 function show(name) {
@@ -156,6 +156,15 @@ function buildEdit() {
   E.left = btn('◀', () => ink.moveCursor(-1));
   E.right = btn('▶', () => ink.moveCursor(1));
   E.space = btn('空白', () => ink.insertSpace());
+  // 自動空白（v7 から）: あり にすると、字を書いて 2.3 秒なにも書かなければ空白を 1 つ入れる（押すたびに あり ⇔ なし）
+  E.auto = btn('', () => {
+    const on = !S.settings().autoSpace;
+    S.setSettings({ autoSpace: on });
+    showAuto();
+    toast(on ? '字を書いて 2.3 秒たつと、自動で空白を入れます' : '自動の空白をやめました');
+  });
+  E.auto.classList.add('auto');
+  showAuto();
   E.nl = btn('改行', () => ink.insertNewline(), TINT_OK);
   E.del = btn('消す', () => ink.backspace(), TINT_DEL);
   E.undo = btn('戻す', () => ink.undo());
@@ -188,12 +197,20 @@ function arrange() {
   const side = $('edit-side'), r1 = $('edit-row1'), r2 = $('edit-row2');
   side.innerHTML = r1.innerHTML = r2.innerHTML = '';
   if (land) {
-    side.append(E.undo, E.del, E.space, E.nl);
+    side.append(E.undo, E.del, E.space, E.auto, E.nl);
     r1.append(E.list, E.send, E.fig, E.rot, E.left, E.right);
   } else {
     r1.append(E.list, E.fig, E.send, E.rot);
-    r2.append(E.left, E.right, E.space, E.nl, E.del, E.undo);
+    r2.append(E.left, E.right, E.space, E.auto, E.nl, E.del, E.undo);
   }
+}
+
+/** 自動空白のボタンの字と色（あり は黄色） */
+function showAuto() {
+  const on = S.settings().autoSpace;
+  E.auto.textContent = '自動\n空白\n' + (on ? 'あり' : 'なし');
+  E.auto.classList.toggle('yes', on);
+  if (ink) ink.setAutoSpace(on);
 }
 
 async function openEdit(id) {
@@ -299,20 +316,38 @@ async function drawFigure(idx, fig) {
 
 async function shareNote(n) {
   if (!n || !n.items.length) { toast('まだ何も書いていません'); return; }
-  const v = await dialog({
-    title: 'このメモを送る・保存する',
-    items: [{ text: 'PDF で送る（拡大してもきれい・印刷向き）', value: 'pdf' },
-            { text: '画像で送る（LINE などですぐ見える）', value: 'png' }],
-  });
+  // v7 から: 文字の一覧ではなく、うすい色の角の丸い横長のボタン（Android 版 v22 と同じ）。
+  // 画像・PDF の組ごとに、縦の画面 / 横の画面の 1 行に合わせる 2 つ
+  const body = el('div', 'sendlist');
+  let pick;
+  const chosen = new Promise(ok => { pick = ok; });
+  const kinds = [['縦の画面の 1 行に合わせる', '字が大きめ'], ['横の画面の 1 行に合わせる', '1 枚にたくさん入る']];
+  const group = (title, kind, cls) => {
+    body.appendChild(el('div', 'sendhead', title));
+    kinds.forEach(([a, b], k) => {
+      const x = el('button', 'sendbtn ' + cls);
+      x.type = 'button';
+      x.append(el('span', 'main', a), el('span', 'sub', b));
+      x.addEventListener('click', () => pick({ kind, land: k === 1 }));
+      body.appendChild(x);
+    });
+  };
+  group('画像で送る（LINE などですぐ見える）', 'png', 'green');
+  group('PDF で送る（印刷向き・拡大できれい）', 'pdf', 'blue');
+  body.appendChild(el('div', 'sendnote', '「ファイルに保存」も、次の画面（送る・保存する）から選べます'));
+  const dlgP = dialog({ title: 'このメモを送る・保存する', body });
+  const v = await Promise.race([chosen, dlgP]);
+  document.querySelectorAll('.dlg-back').forEach(b => b.remove());
   if (!v) return;
-  toast(v === 'pdf' ? 'PDF を作っています…' : '画像を作っています…');
+  const units = lineUnits(v.land);
+  toast(v.kind === 'pdf' ? 'PDF を作っています…' : '画像を作っています…');
   try {
     // 名前: 前にクラウドに保存したときに読んだ冒頭の文字があれば使う（ここでは読みに行かない）
     const head = await C.headFor(n, false);
     let blob;
-    if (v === 'pdf') blob = new Blob([await notesPdf([n])], { type: 'application/pdf' });
-    else blob = await new Promise(ok => renderImage(n).toBlob(ok, 'image/png'));
-    const file = new File([blob], N.fileName(n, head, v === 'pdf' ? '.pdf' : '.png'), { type: blob.type });
+    if (v.kind === 'pdf') blob = new Blob([await notesPdf([n], units)], { type: 'application/pdf' });
+    else blob = await new Promise(ok => renderImage(n, units).toBlob(ok, 'image/png'));
+    const file = new File([blob], N.fileName(n, head, v.kind === 'pdf' ? '.pdf' : '.png'), { type: blob.type });
     await sendFile(file);
   } catch (e) {
     toast('作れませんでした: ' + e.message, true);
@@ -341,9 +376,13 @@ export async function sendFile(file) {
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
 }
 
-/** メモを画像にする。幅 1200 ピクセル、罫線のノートで、高さは書いた行の数に合わせる */
-function renderImage(n) {
-  const W = 1200, M = 48, HEAD = 56, lineH = 64;
+/**
+ * メモを画像にする。幅 1200 ピクセル、罫線のノートで、高さは書いた行の数に合わせる。
+ * units: 1 行の長さ（行の単位。書く画面の 1 行と同じにすると、行の切れ目が画面と同じ）。0 ならいつもの大きさ（v7 から）
+ */
+function renderImage(n, units = 0) {
+  const W = 1200, M = 48, HEAD = 56;
+  const lineH = units > 0 ? Math.max(30, Math.min(200, (W - M * 2) / units)) : 64;
   const maxW = (W - M * 2) / lineH;
   const { lineOf, xOf, lines: l0 } = N.layout(n.items, maxW);
   const lines = Math.max(3, l0);
@@ -358,7 +397,7 @@ function renderImage(n) {
   c.stroke();
   c.fillStyle = '#808080';
   c.font = '24px -apple-system, "Hiragino Sans", sans-serif';
-  c.fillText('手書きメモ　' + N.fmtDate(n.updated), M, M + 24);
+  c.fillText('手書きメモ　' + N.fmtDate(n.updated || Date.now()), M, M + 24); // まだ保存していないメモは今の時刻
   const pen = N.canvasPen(c);
   n.items.forEach((it, i) => {
     if (it.type === N.GLYPH || it.type === N.FIGURE)
