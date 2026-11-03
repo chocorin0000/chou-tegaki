@@ -61,7 +61,7 @@ export function askPersist() {
 // ---- 設定 ----
 
 const PREF = 'inkmemo.settings';
-const DEF = { url: '', key: '', auto: true, pull: true, small: false, rot: false, rotOther: false, autoSpace: false };
+const DEF = { url: '', key: '', auto: true, pull: true, small: false, rot: false, rotOther: false, autoSpace: false, commitMs: 700 };
 
 export function settings() {
   try { return Object.assign({}, DEF, JSON.parse(localStorage.getItem(PREF) || '{}')); }

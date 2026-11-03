@@ -9,6 +9,10 @@ import { layout, drawItem, glyph, space, newline, span, figScale, canvasPen, GLY
 export const COMMIT_DELAY_MS = 700;
 /** 自動空白（v7 から、Android 版 v20・v21 と同じ）: 指を離してこれだけ書かなければ空白を 1 つ入れる */
 export const AUTO_SPACE_MS = 2300;
+/** 字が入るまでの時間の幅（設定の画面で決める。settings の commitMs） */
+export const COMMIT_MIN_MS = 300, COMMIT_MAX_MS = 5000;
+/** 字が入ってから自動の空白を入れるまで（ふつうは 0.7 + 1.6 = 2.3 秒。遅くしたときも最低 1 秒あける） */
+export const spaceAfterCommit = ms => Math.max(AUTO_SPACE_MS - ms, 1000);
 const LINEW = 'inkmemo.lineW'; // 縦の画面・横の画面の 1 行の長さ（行の単位）。送るときに使う
 
 /** 書く画面の 1 行の長さ（行の単位）。まだその向きで開いていなければ、画面の大きさから見積もる */
@@ -30,7 +34,7 @@ export class InkView {
     this.note = null; this.cursor = 0; this.scrollY = 0;
     this.pending = []; this.cur = null;
     this.recentH = []; this.lastBottom = 0;
-    this.autoSpace = false; this.spaceTimer = 0;
+    this.autoSpace = false; this.spaceTimer = 0; this.commitMs = COMMIT_DELAY_MS;
     this.undoStack = [];
     this.ptrs = new Map();
     this.scrolling = false; this.penSeen = false;
@@ -64,16 +68,21 @@ export class InkView {
     } catch (e) { /* 覚えられなくても見積もる */ }
   }
 
+  /** 字が入るまでの時間（ミリ秒） */
+  setCommitDelay(ms) {
+    this.commitMs = Math.max(COMMIT_MIN_MS, Math.min(COMMIT_MAX_MS, Number(ms) || COMMIT_DELAY_MS));
+  }
+
   setAutoSpace(on) {
     this.autoSpace = on;
     if (!on) clearTimeout(this.spaceTimer);
   }
 
-  /** 書くのを止めて字が入ったとき（0.7 秒）。自動空白があれば、指を離してから 2.3 秒で空白を入れる用意をする */
+  /** 書くのを止めて字が入ったとき。自動空白があれば、空白を入れる用意をする */
   commitByTimer() {
     const had = this.pending.length > 0;
     this.commitPending();
-    if (had && this.autoSpace) this.spaceTimer = setTimeout(() => this.autoSpaceNow(), AUTO_SPACE_MS - COMMIT_DELAY_MS);
+    if (had && this.autoSpace) this.spaceTimer = setTimeout(() => this.autoSpaceNow(), spaceAfterCommit(this.commitMs));
   }
 
   /** 自動の空白を入れる（カーソルの前が手書きの字のときだけ。空白・改行・図のあとには入れない） */
@@ -131,7 +140,7 @@ export class InkView {
     if (this.pending.length) {
       this.pending.pop();
       clearTimeout(this.timer);
-      if (this.pending.length) this.timer = setTimeout(() => this.commitByTimer(), COMMIT_DELAY_MS);
+      if (this.pending.length) this.timer = setTimeout(() => this.commitByTimer(), this.commitMs);
       this.invalidate();
       return;
     }
@@ -387,7 +396,7 @@ export class InkView {
           else this.tapCursor(p[0], p[1]);
         } else {
           this.pending.push(this.cur);
-          this.timer = setTimeout(() => this.commitByTimer(), COMMIT_DELAY_MS);
+          this.timer = setTimeout(() => this.commitByTimer(), this.commitMs);
         }
         this.cur = null;
       }
@@ -399,7 +408,7 @@ export class InkView {
     if (this.scrolling) {
       if (this.ptrs.size) { this.lastScrollY = this.avgY(); return; }
       this.scrolling = false;
-      if (this.pending.length && !this.cur) this.timer = setTimeout(() => this.commitByTimer(), COMMIT_DELAY_MS);
+      if (this.pending.length && !this.cur) this.timer = setTimeout(() => this.commitByTimer(), this.commitMs);
     }
     this.invalidate();
   }
@@ -408,7 +417,7 @@ export class InkView {
     this.ptrs.delete(e.pointerId);
     if (e.pointerId === this.drawId) { this.drawId = null; this.cur = null; }
     if (!this.ptrs.size) this.scrolling = false;
-    if (this.pending.length) this.timer = setTimeout(() => this.commitByTimer(), COMMIT_DELAY_MS);
+    if (this.pending.length) this.timer = setTimeout(() => this.commitByTimer(), this.commitMs);
     this.invalidate();
   }
 

@@ -3,11 +3,11 @@ import * as N from './note.js';
 import * as S from './store.js';
 import * as C from './cloud.js';
 import { notesPdf } from './pdf.js';
-import { InkView, lineUnits } from './ink.js';
+import { InkView, lineUnits, COMMIT_DELAY_MS, COMMIT_MIN_MS, COMMIT_MAX_MS, spaceAfterCommit } from './ink.js';
 import { openDraw } from './draw.js';
 import { el, btn, toast, dialog, confirmDlg, TINT_FIG, TINT_DEL, TINT_OK, applyRotation, rotation, viewSize } from './ui.js';
 
-export const VERSION = 'v10';
+export const VERSION = 'v11';
 const $ = id => document.getElementById(id);
 const screens = ['list', 'edit', 'draw', 'set'];
 function show(name) {
@@ -161,7 +161,8 @@ function buildEdit() {
     const on = !S.settings().autoSpace;
     S.setSettings({ autoSpace: on });
     showAuto();
-    toast(on ? '字を書いて 2.3 秒たつと、自動で空白を入れます' : '自動の空白をやめました');
+    const cm = commitMs();
+    toast(on ? '字を書いて ' + secText(cm + spaceAfterCommit(cm)) + ' 秒たつと、自動で空白を入れます' : '自動の空白をやめました');
   });
   E.auto.classList.add('auto');
   showAuto();
@@ -210,8 +211,16 @@ function showAuto() {
   const on = S.settings().autoSpace;
   E.auto.textContent = '自動\n空白\n' + (on ? 'あり' : 'なし');
   E.auto.classList.toggle('yes', on);
-  if (ink) ink.setAutoSpace(on);
+  if (ink) { ink.setAutoSpace(on); ink.setCommitDelay(commitMs()); }
 }
+
+/** 字が入るまでの時間（ミリ秒。設定の画面で決める） */
+function commitMs() {
+  const v = Number(S.settings().commitMs) || COMMIT_DELAY_MS;
+  return Math.max(COMMIT_MIN_MS, Math.min(COMMIT_MAX_MS, v));
+}
+/** 700 → 0.7、1500 → 1.5、2000 → 2 */
+function secText(ms) { return String(Math.round(ms / 10) / 100); }
 
 async function openEdit(id) {
   note = id ? await S.loadNote(id) : null;
@@ -421,6 +430,39 @@ function showSettings() {
   const label = t => box.appendChild(el('div', 'label', t));
   const result = el('div', 'result');
   const say = t => { result.textContent = t; };
+
+  // 字が行に入るまでの時間（v11）
+  sec('字が行に入るまでの時間');
+  note('指を離してから、書いた字が小さくなって行に入るまでの時間です。画数の多い字をゆっくり書くと途中で入ってしまうときは長く、どんどん続けて書きたいときは短くします。0.3〜5 秒で決められます（ふつうは 0.7 秒）。');
+  {
+    const row = el('div', 'secRow');
+    const now = el('div', 'result');
+    const paint = () => {
+      const ms = commitMs();
+      for (const b of row.children) b.classList.toggle('on', Number(b.dataset.ms) === ms);
+      now.textContent = '今は ' + secText(ms) + ' 秒（自動空白が「あり」のときは、指を離して ' + secText(ms + spaceAfterCommit(ms)) + ' 秒で空白が入ります）';
+    };
+    const setMs = ms => {
+      ms = Math.max(COMMIT_MIN_MS, Math.min(COMMIT_MAX_MS, Math.round(ms)));
+      S.setSettings({ commitMs: ms }); paint();
+      toast('字が入るまでの時間を ' + secText(ms) + ' 秒にしました');
+    };
+    for (const ms of [500, 700, 1000, 1500, 2000]) {
+      const b = btn(secText(ms) + ' 秒', () => setMs(ms));
+      b.dataset.ms = ms; row.appendChild(b);
+    }
+    // ほかの秒数は入力の箱（prompt）で（iPad でページの中の文字の枠を押すと落ちたため、v6 から枠は置かない）
+    const other = btn('ほかの秒数を入れる', () => {
+      const v = prompt('字が入るまでの秒数（0.3〜5）を入れてください', secText(commitMs()));
+      if (v == null) return;
+      const d = parseFloat(v.trim().replace(/[．，,]/g, '.').replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)));
+      if (!(d >= 0.3 && d <= 5)) { toast('0.3 から 5 までの数字を入れてください'); return; }
+      setMs(d * 1000);
+    });
+    other.classList.add('wide');
+    box.append(row, other, now);
+    paint();
+  }
 
   sec('自動でクラウドに保存（Google ドライブ）');
   note('Android の超！手書きと同じスクリプト（URL と合言葉）を入れると、書き終えるたびに Google ドライブの「手書きメモ」フォルダへ自動で保存します。'
