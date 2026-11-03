@@ -21,8 +21,8 @@
      iPad はよけ（20）が 0 になり、ボタンの下の空きが小さくなる） */
   --pad-b: max(0px, calc(env(safe-area-inset-bottom, 0px) - 34px)); /* v9: iPhone は 0（もう少し下まで） */
 }
-/* iPad（v9 から画面の下の端まで広げる）: よけ（20）から 8 減らして 12 あける */
-html.ipad { --pad-b: max(0px, calc(env(safe-area-inset-bottom, 0px) - 8px)); }
+/* iPad（v9 から画面の下の端まで広げる）: v10 から、よけ（20）に 6 足して 26 あける（v9 の 12 では下が 2mm くらい欠けた） */
+html.ipad { --pad-b: calc(env(safe-area-inset-bottom, 0px) + 6px); }
 /* 横向きボタンで回したとき: 機械の下の端は横、横の端が下になる。下の端の段は少し（6）あける（欠けないように） */
 html.rot90 {
   --sa-t: env(safe-area-inset-right, 0px); --sa-r: max(0px, calc(env(safe-area-inset-bottom, 0px) - 24px));
